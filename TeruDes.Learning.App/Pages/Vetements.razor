@@ -1,0 +1,188 @@
+﻿@page "/vetements"
+@inject HttpClient Http
+
+<h3>Les Vetements</h3>
+
+@if (words == null)
+{
+    <p><em>Laden...</em></p>
+}
+else
+{
+    <div class="row">
+        <button class="btn btn-secondary" @onclick="StartCourse">Start / Hernieuw</button>
+    </div>
+
+    @if (current != null)
+    {
+        <div class="row">
+            &nbsp;
+        </div>
+        <div class="row">
+            <textarea class="text-center fw-bold" size="5" disabled="disabled">@question</textarea>
+        </div>
+        <div class="row">
+            <button class="btn btn-info" @onclick="ControlAnswer" disabled="@(state != State.Question)">Controleer</button>
+        </div>
+        <div class="row">
+            <textarea class="text-center fw-bold" size="5" disabled="disabled">@correctAnswer</textarea>
+        </div>
+        <div class="row">
+            &nbsp;
+        </div>
+        <div class="row">
+            <div class="col-6">
+                <button class="btn btn-success" style="width: 100%" @onclick="CorrectAnswer" disabled="@(state != State.Answer)">Juist</button>
+            </div>
+            <div class="col-6">
+                <button class="btn btn-danger" style="width: 100%" @onclick="WrongAnswer" disabled="@(state != State.Answer)">Fout</button>
+            </div>
+        </div>
+        <div class="row">
+            &nbsp;
+        </div>
+        <div class="row">
+            <hr />
+        </div>
+        <div class="row">
+            &nbsp;
+        </div>
+        <div class="row">
+            <input type="checkbox" @onchange="eventArgs => { showList = (bool)eventArgs.Value; }" />
+        </div>
+    }
+
+    if (showList)
+    {
+        <div class="row">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Gewicht</th>
+                        <th>Frans</th>
+                        <th>Nederlands</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var word in words)
+                    {
+                        <tr>
+                            <td>@word.Weight</td>
+                            <td>@word.French</td>
+                            <td>@word.Dutch</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+
+@code {
+    private Word[]? words;
+    private Word? current = null;
+    private static Random _random = new Random();
+    private string? question;
+    private string? correctAnswer;
+    private State state = State.Loaded;
+    private bool showList = false;
+
+    private bool debug = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        words = await Http.GetFromJsonAsync<Word[]>("courses/vetements.json");
+    }
+
+    public class Word
+    {
+        public int Weight { get; set; } = 0;
+
+        public string French { get; set; } = null!;
+        public string Dutch { get; set; } = null!;
+
+        public string From { get { return French; } }
+        public string To { get { return Dutch; } }
+    }
+
+    private void StartCourse()
+    {
+        state = State.Loaded;
+
+        for(int i = 0; i < words!.Length; i++)
+        {
+            words[i].Weight = 5;
+        }
+        SetNextWord();
+
+        state = State.Question;
+    }
+
+    private void SetNextWord()
+    {
+        current = GetRandomItem(words!, w => w.Weight);
+
+
+        //int i = _random.Next(words!.Length);
+        //current = words[i];
+        question = current.From;
+
+        state = State.Question;
+    }
+
+    private void ControlAnswer()
+    {
+        correctAnswer = current!.To;
+        state = State.Answer;
+    }
+
+    private void CorrectAnswer()
+    {
+        if (current!.Weight > 2)
+            current!.Weight -= 2;
+        else if (current!.Weight == 2)
+            current!.Weight = 1;
+
+        correctAnswer = string.Empty;
+
+        SetNextWord();
+    }
+
+    private void WrongAnswer()
+    {
+        current!.Weight += 3;
+
+        correctAnswer = string.Empty;
+
+        SetNextWord();
+    }
+
+    private T GetRandomItem<T>(IEnumerable<T> itemsEnumerable, Func<T, int> weightKey)
+    {
+        var items = itemsEnumerable.ToList();
+
+        var totalWeight = items.Sum(x => weightKey(x));
+        var randomWeightedIndex = _random.Next(totalWeight);
+        var itemWeightedIndex = 0;
+        foreach (var item in items)
+        {
+            itemWeightedIndex += weightKey(item);
+            if (randomWeightedIndex < itemWeightedIndex)
+                return item;
+        }
+        throw new ArgumentException("Collection count and weights must be greater than 0");
+    }
+
+    private void ShowList()
+    {
+
+    }
+
+    enum State
+    {
+        Loaded,
+        Question,
+        Answer
+    }
+}
